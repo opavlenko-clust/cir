@@ -1,0 +1,109 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  # ── 1. Security ──────────────────────────────────────────
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Snyk vulnerability scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+      - name: ESLint security
+        run: npm run lint:security
+
+  # ── 2. Type check ────────────────────────────────────────
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  # ── 3. Tests ─────────────────────────────────────────────
+  test:
+    name: Playwright Tests
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npx playwright install --with-deps
+
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: op://Factory Infrastructure/Clerk/publishable_key
+          CLERK_SECRET_KEY: op://Factory Infrastructure/Clerk/secret_key
+          NEXT_PUBLIC_SUPABASE_URL: op://Factory Infrastructure/Supabase/url
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: op://Factory Infrastructure/Supabase/anon_key
+
+      - name: Build
+        run: npm run build
+
+      - name: Run web tests
+        run: npm run test:web
+
+      - name: Run mobile tests
+        run: npm run test:mobile
+
+      - name: Run security tests
+        run: npm run test:security
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ── 4. Deploy (тільки після зелених тестів) ──────────────
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [security, test]
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          # main → production, staging → preview
+          vercel-args: ${{ github.ref == 'refs/heads/main' && '--prod' || '' }}

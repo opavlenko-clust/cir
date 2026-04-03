@@ -1,0 +1,2 @@
+// Sentry edge config
+export {};

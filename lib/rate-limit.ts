@@ -8,7 +8,7 @@ export function withRateLimit(
   { limit = 60, windowMs = 60_000 } = {}
 ) {
   return async (req: NextRequest) => {
-    const ip = req.ip ?? req.headers.get('x-forwarded-for') ?? 'anonymous'
+    const ip = (req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'anonymous').split(',')[0].trim()
     const now = Date.now()
     const record = rateLimit.get(ip)
 

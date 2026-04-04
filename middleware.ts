@@ -1,31 +1,42 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-// Public routes — no auth required
 const PUBLIC_PREFIXES = ['/', '/sign-in', '/sign-up', '/api/webhooks']
 
-function isPublicRoute(req: NextRequest): boolean {
-  const { pathname } = req.nextUrl
-  return PUBLIC_PREFIXES.some(
+export async function middleware(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({ request })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return request.cookies.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options))
+        },
+      },
+    }
+  )
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { pathname } = request.nextUrl
+  const isPublic = PUBLIC_PREFIXES.some(
     p => pathname === p || pathname.startsWith(p + '/')
   )
-}
 
-export default function middleware(req: NextRequest) {
-  if (isPublicRoute(req)) {
-    return NextResponse.next()
+  if (!isPublic && !user) {
+    const url = new URL('/sign-in', request.url)
+    url.searchParams.set('redirect_url', request.url)
+    return NextResponse.redirect(url)
   }
 
-  // Clerk sets __session cookie for authenticated users
-  const session = req.cookies.get('__session')?.value
-
-  if (!session) {
-    const signInUrl = new URL('/sign-in', req.url)
-    signInUrl.searchParams.set('redirect_url', req.url)
-    return NextResponse.redirect(signInUrl)
-  }
-
-  return NextResponse.next()
+  return supabaseResponse
 }
 
 export const config = {

@@ -1,42 +1,32 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Публічні роути — доступні без авторизації
-const isPublicRoute = createRouteMatcher([
-  '/',
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/api/webhooks(.*)',
-])
+// Public routes — no auth required
+const PUBLIC_PREFIXES = ['/', '/sign-in', '/sign-up', '/api/webhooks']
 
-// Admin-only роути
-const isAdminRoute = createRouteMatcher([
-  '/admin(.*)',
-])
+function isPublicRoute(req: NextRequest): boolean {
+  const { pathname } = req.nextUrl
+  return PUBLIC_PREFIXES.some(
+    p => pathname === p || pathname.startsWith(p + '/')
+  )
+}
 
-export default clerkMiddleware(async (auth, req: NextRequest) => {
-  // Публічні роути — пропускаємо
-  if (isPublicRoute(req)) return NextResponse.next()
-
-  // Перевіряємо авентифікацію
-  const { userId, sessionClaims } = await auth()
-
-  if (!userId) {
-    return NextResponse.redirect(new URL('/sign-in', req.url))
+export default function middleware(req: NextRequest) {
+  if (isPublicRoute(req)) {
+    return NextResponse.next()
   }
 
-  // Перевіряємо роль для admin роутів
-  if (isAdminRoute(req)) {
-    const role = sessionClaims?.metadata?.role as string | undefined
+  // Clerk sets __session cookie for authenticated users
+  const session = req.cookies.get('__session')?.value
 
-    if (role !== 'admin') {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
-    }
+  if (!session) {
+    const signInUrl = new URL('/sign-in', req.url)
+    signInUrl.searchParams.set('redirect_url', req.url)
+    return NextResponse.redirect(signInUrl)
   }
 
   return NextResponse.next()
-})
+}
 
 export const config = {
   matcher: [

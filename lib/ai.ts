@@ -1,14 +1,26 @@
 // lib/ai.ts
 import OpenAI from 'openai'
 
-export const ai = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY,
-  defaultHeaders: {
-    'HTTP-Referer': `https://${process.env.NEXT_PUBLIC_APP_DOMAIN}`,
-    'X-Title': process.env.NEXT_PUBLIC_APP_NAME,
-  },
-})
+let _client: OpenAI | null = null
+
+function getClient(): OpenAI {
+  if (!_client) {
+    _client = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: process.env.OPENROUTER_API_KEY ?? 'missing',
+      defaultHeaders: {
+        'HTTP-Referer': `https://${process.env.NEXT_PUBLIC_APP_DOMAIN}`,
+        'X-Title': process.env.NEXT_PUBLIC_APP_NAME,
+      },
+    })
+  }
+  return _client
+}
+
+// Proxy so existing `ai.chat.completions.create(...)` calls keep working
+export const ai = {
+  get chat() { return getClient().chat },
+}
 
 // Моделі для різних задач
 export const MODELS = {

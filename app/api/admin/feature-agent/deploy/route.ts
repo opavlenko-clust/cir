@@ -51,6 +51,10 @@ Rules:
 - Use "use client" only when needed (event handlers, useState, etc.)
 - Use Tailwind for all styling
 - Keep it minimal — only what was discussed
+- TypeScript strict: always use explicit types, NEVER leave implicit "any" (no untyped function params)
+- Never modify infrastructure files unless explicitly asked: middleware.ts, lib/supabase/server.ts, lib/supabase/client.ts, lib/ai.ts, lib/github.ts, next.config.js
+- Every new page/route that calls Supabase or does redirects must export: export const dynamic = 'force-dynamic'
+- When writing setAll cookie handlers, always type the param: (cookiesToSet: { name: string; value: string; options: CookieOptions }[])
 `
 
 type FileChange = {

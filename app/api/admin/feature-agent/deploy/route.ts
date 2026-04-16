@@ -55,6 +55,19 @@ Rules:
 - Never modify infrastructure files unless explicitly asked: middleware.ts, lib/supabase/server.ts, lib/supabase/client.ts, lib/ai.ts, lib/github.ts, next.config.js
 - Every new page/route that calls Supabase or does redirects must export: export const dynamic = 'force-dynamic'
 - When writing setAll cookie handlers, always type the param: (cookiesToSet: { name: string; value: string; options: CookieOptions }[])
+
+UI Style (minimalist — Tailwind only, no component libraries):
+- White background, generous whitespace
+- text-gray-900 headings, text-gray-500 secondary, blue-600 accent
+- Borders: border border-gray-200 — subtle, never decorative
+- rounded-lg for cards/inputs, rounded for buttons
+- No shadows except shadow-sm on cards
+- Button primary: bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50
+- Button secondary: bg-gray-100 text-gray-800 px-4 py-2 rounded text-sm hover:bg-gray-200
+- Input: border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500
+- Card: border border-gray-200 rounded-lg p-6 bg-white
+- Page layout: max-w-3xl mx-auto p-8
+- Typography: text-xl font-bold (page title), text-base font-semibold (section), text-sm (body), text-sm text-gray-500 (muted)
 `
 
 type FileChange = {

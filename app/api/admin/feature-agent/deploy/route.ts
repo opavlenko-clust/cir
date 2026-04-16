@@ -54,6 +54,7 @@ Rules:
 - TypeScript strict: always use explicit types, NEVER leave implicit "any" (no untyped function params)
 - Never modify infrastructure files unless explicitly asked: middleware.ts, lib/supabase/server.ts, lib/supabase/client.ts, lib/ai.ts, lib/github.ts, next.config.js
 - Every new page/route that calls Supabase or does redirects must export: export const dynamic = 'force-dynamic'
+- When a feature needs a new DB table or column, include a migration file: supabase/migrations/<timestamp>_<name>.sql (timestamp = unix seconds). The migration will be auto-run against Supabase. Always add IF NOT EXISTS to CREATE TABLE.
 - When writing setAll cookie handlers, always type the param: (cookiesToSet: { name: string; value: string; options: CookieOptions }[])
 
 UI Style (minimalist — Tailwind only, no component libraries):
@@ -128,9 +129,44 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Auto-run Supabase migrations if any SQL files were generated
+  const migrations = plan.files.filter(
+    f => f.path.startsWith('supabase/migrations/') && f.path.endsWith('.sql') && f.action !== 'delete'
+  )
+
+  let migrationsRun = 0
+  const migrationErrors: string[] = []
+
+  if (migrations.length > 0) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+    const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1]
+    const managementToken = process.env.SUPABASE_MANAGEMENT_TOKEN
+
+    if (projectRef && managementToken) {
+      for (const migration of migrations) {
+        const res = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${managementToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query: migration.content }),
+        })
+        if (res.ok) {
+          migrationsRun++
+        } else {
+          const err = await res.json().catch(() => ({ message: res.statusText })) as { message?: string }
+          migrationErrors.push(`${migration.path}: ${err.message ?? res.statusText}`)
+        }
+      }
+    }
+  }
+
   return NextResponse.json({
     branch: plan.branch,
     commitMessage: plan.commitMessage,
     fileCount: plan.files.length,
+    migrationsRun,
+    migrationErrors,
   })
 }

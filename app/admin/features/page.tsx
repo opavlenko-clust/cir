@@ -131,6 +131,7 @@ export default function FeatureAgent() {
     setSteps([
       { label: 'Генерую код', status: 'active' },
       { label: 'Пушу в GitHub', status: 'pending' },
+      { label: 'Міграції БД', status: 'pending' },
       { label: 'Vercel build', status: 'pending' },
     ])
     setLoading(true)
@@ -156,6 +157,15 @@ export default function FeatureAgent() {
 
       setStep('Генерую код', 'done', `${data.fileCount} файл(ів)`)
       setStep('Пушу в GitHub', 'done', data.branch)
+
+      if (data.migrationsRun > 0) {
+        setStep('Міграції БД', 'done', `${data.migrationsRun} запущено`)
+      } else if (data.migrationErrors?.length > 0) {
+        setStep('Міграції БД', 'error', data.migrationErrors[0])
+      } else {
+        setStep('Міграції БД', 'done', 'немає міграцій')
+      }
+
       setStep('Vercel build', 'active', 'Очікуємо...')
 
       setBranch(data.branch)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export const maxDuration = 60 // Vercel Pro required
+export const maxDuration = 300 // Vercel Pro: up to 300s
 import { createClient } from '@/lib/supabase/server'
 import { ai, MODELS } from '@/lib/ai'
 import { createBranch, upsertFile, deleteFile } from '@/lib/github'
